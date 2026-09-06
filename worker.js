@@ -117,30 +117,6 @@ function aplicarPropiedad(state, prop) {
     state.bateria = String(prop.value);
   }
 }
-  if (prop.code === "temp_current") {
-    state.ambiente = numero(prop.value);
-  }
-
-  if (prop.code === "temp_current_external") {
-    state.externa = numero(prop.value);
-  }
-
-  if (
-    prop.code === "humidity_value" ||
-    prop.code === "humidity_current" ||
-    prop.code === "humidity"
-  ) {
-    state.humedad = numero(prop.value);
-  }
-
-  if (
-    prop.code === "battery_state" ||
-    prop.code === "battery_percentage" ||
-    prop.code === "battery_value"
-  ) {
-    state.bateria = String(prop.value);
-  }
-}
 
 async function guardarReporte(env, message) {
   if (message?.bizCode !== "devicePropertyMessage") return 0;
