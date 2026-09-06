@@ -119,11 +119,43 @@ function aplicarPropiedad(state, prop) {
 }
 
 async function guardarReporte(env, message) {
-  if (message?.bizCode !== "devicePropertyMessage") return 0;
+  const tipo = message?.bizCode;
+const biz = message.bizData || {};
+const sensorId = biz.devId;
+const nombre = SENSORES[sensorId];
 
-  const biz = message.bizData || {};
-  const sensorId = biz.devId;
-  const nombre = SENSORES[sensorId];
+if (tipo === "deviceOnline" || tipo === "deviceOffline") {
+  if (!nombre) return 0;
+
+  const estado =
+    tipo === "deviceOnline" ? "online" : "offline";
+
+  const fecha = Number(
+    biz.time ||
+    biz.timestamp ||
+    message.ts ||
+    Date.now()
+  );
+
+  await env.DB.prepare(`
+    INSERT INTO conectividad (
+      sensor_id,
+      nombre,
+      estado,
+      fecha
+    )
+    VALUES (?, ?, ?, ?)
+  `).bind(
+    sensorId,
+    nombre,
+    estado,
+    fecha
+  ).run();
+
+  return 1;
+}
+
+if (tipo !== "devicePropertyMessage") return 0;
 
   if (!nombre || !Array.isArray(biz.properties)) return 0;
 
