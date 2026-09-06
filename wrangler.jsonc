@@ -1,0 +1,19 @@
+{
+  "name": "tuya-message-receiver",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "keep_vars": true,
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "electroclima-monitor-db",
+      "database_id": "516286a8-67ff-4a1d-ab20-390651db3e60"
+    }
+  ],
+
+  "triggers": {
+    "crons": ["* * * * *"]
+  }
+}
