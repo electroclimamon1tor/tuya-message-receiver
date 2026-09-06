@@ -92,6 +92,32 @@ async function ultimoEstado(env, sensorId) {
 
 function aplicarPropiedad(state, prop) {
   if (prop.code === "temp_current") {
+    const valor = numero(prop.value);
+    state.ambiente = valor !== null ? valor / 10 : null;
+  }
+
+  if (prop.code === "temp_current_external") {
+    const valor = numero(prop.value);
+    state.externa = valor !== null ? valor / 10 : null;
+  }
+
+  if (
+    prop.code === "humidity_value" ||
+    prop.code === "humidity_current" ||
+    prop.code === "humidity"
+  ) {
+    state.humedad = numero(prop.value);
+  }
+
+  if (
+    prop.code === "battery_state" ||
+    prop.code === "battery_percentage" ||
+    prop.code === "battery_value"
+  ) {
+    state.bateria = String(prop.value);
+  }
+}
+  if (prop.code === "temp_current") {
     state.ambiente = numero(prop.value);
   }
 
