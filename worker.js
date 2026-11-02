@@ -1,10 +1,5 @@
 import { createHash } from "node:crypto";
 
-const SENSORES = {
-  "ebe618fa78540911a2yzmt": "Abajo",
-  "ebace986633146a3a3jw4c": "Arriba",
-};
-
 function md5(text) {
   return createHash("md5").update(text).digest("hex");
 }
@@ -118,11 +113,19 @@ function aplicarPropiedad(state, prop) {
   }
 }
 
-async function guardarReporte(env, message) {
+export async function guardarReporte(env, message) {
   const tipo = message?.bizCode;
 const biz = message.bizData || {};
 const sensorId = biz.devId;
-const nombre = SENSORES[sensorId];
+if (!sensorId) return 0;
+const identidad = await env.DB.prepare(`
+  SELECT t.id, t.alias, ti.inicio
+  FROM termometro_identidades ti
+  JOIN termometros t ON t.id = ti.termometro_id AND t.sensor_id = ti.sensor_id
+  WHERE ti.sensor_id = ? AND ti.fin IS NULL
+`).bind(sensorId).first();
+if (!identidad) return 0;
+const nombre = identidad.alias;
 
 if (tipo === "deviceOnline" || tipo === "deviceOffline") {
   if (!nombre) return 0;
@@ -137,22 +140,28 @@ if (tipo === "deviceOnline" || tipo === "deviceOffline") {
     Date.now()
   );
 
-  await env.DB.prepare(`
+  if (!Number.isSafeInteger(fecha) || fecha < Number(identidad.inicio)) return 0;
+  const resultado = await env.DB.prepare(`
     INSERT INTO conectividad (
       sensor_id,
       nombre,
       estado,
       fecha
     )
-    VALUES (?, ?, ?, ?)
+    SELECT ?, ?, ?, ? WHERE EXISTS (
+      SELECT 1 FROM termometro_identidades
+      WHERE sensor_id = ? AND fin IS NULL AND inicio <= ?
+    )
   `).bind(
     sensorId,
     nombre,
     estado,
+    fecha,
+    sensorId,
     fecha
   ).run();
 
-  return 1;
+  return Number(resultado.meta?.changes || 0);
 }
 
 if (tipo !== "devicePropertyMessage") return 0;
@@ -175,20 +184,12 @@ if (tipo !== "devicePropertyMessage") return 0;
     .sort((a, b) => a[0] - b[0]);
 
   for (const [fecha, props] of ordenados) {
+    if (!Number.isSafeInteger(fecha) || fecha < Number(identidad.inicio)) continue;
     for (const prop of props) {
       aplicarPropiedad(state, prop);
     }
 
-    const existe = await env.DB.prepare(`
-      SELECT id
-      FROM mediciones
-      WHERE sensor_id = ? AND fecha = ?
-      LIMIT 1
-    `).bind(sensorId, fecha).first();
-
-    if (existe) continue;
-
-    await env.DB.prepare(`
+    const resultado = await env.DB.prepare(`
       INSERT INTO mediciones (
         sensor_id,
         nombre,
@@ -199,7 +200,12 @@ if (tipo !== "devicePropertyMessage") return 0;
         online,
         fecha
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (
+        SELECT 1 FROM termometro_identidades
+        WHERE sensor_id = ? AND fin IS NULL AND inicio <= ?
+      ) AND NOT EXISTS (
+        SELECT 1 FROM mediciones WHERE sensor_id = ? AND fecha = ?
+      )
     `).bind(
       sensorId,
       nombre,
@@ -208,10 +214,11 @@ if (tipo !== "devicePropertyMessage") return 0;
       state.humedad,
       state.bateria,
       state.online,
-      fecha
+      fecha,
+      sensorId, fecha, sensorId, fecha
     ).run();
 
-    guardadas++;
+    guardadas += Number(resultado.meta?.changes || 0);
   }
 
   return guardadas;
